@@ -34,16 +34,14 @@ class LocationInfoFragment: RetrofitFragment(){
     private lateinit var mItemData : CategoryListResultX
     private lateinit var mActivity : MainActivity
     private lateinit var rvListView: RecyclerView
-    private lateinit var mInfoImg : ImageView
-    private lateinit var mInfoTextView: TextView
-    private lateinit var mInfoMemoTextView : TextView
-    private lateinit var mInfoCategoryTextView: TextView
-    private lateinit var mOpenWebview : TextView
-    private lateinit var mRecGroup : Group
     private lateinit var mAdapter : PlanetListRecyclerAdapter
 
     private var mResults : MutableList<ResultX> = mutableListOf()
     private lateinit var progressBar : ProgressBar
+
+    interface OnItemClickListener {
+        fun onClickWeb(urlString : String)
+    }
 
     companion object {
         fun newInstance(categoryListResultX: CategoryListResultX) : LocationInfoFragment = LocationInfoFragment().apply {
@@ -64,13 +62,16 @@ class LocationInfoFragment: RetrofitFragment(){
 
         mActivity = activity as MainActivity
 
-
-        initView(view)
+        rvListView = view.findViewById(R.id.planet_list_recyclerview)
         mAdapter = PlanetListRecyclerAdapter(object : PlanetListRecyclerAdapter.OnItemClickListener{
             override fun onItemClick(item: ResultX) {
                 //go to planet detail
                 mActivity.replaceFragment(PlanetDetailFragment.newInstance(item), "PlanetDetailFragment", true, true)
 
+            }
+        }, object : OnItemClickListener {
+            override fun onClickWeb(urlString: String) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(urlString)))
             }
         })
 
@@ -86,36 +87,6 @@ class LocationInfoFragment: RetrofitFragment(){
         return view
     }
 
-    fun initView(rootview : View) {
-        mRecGroup = rootview.findViewById(R.id.planet_list_group)
-        mInfoImg = rootview.findViewById(R.id.info_img)
-        mInfoTextView = rootview.findViewById(R.id.info_text)
-        mInfoMemoTextView = rootview.findViewById(R.id.memo_text)
-        rvListView = rootview.findViewById(R.id.planet_list_recyclerview)
-        mOpenWebview = rootview.findViewById(R.id.open_in_webview)
-        mInfoCategoryTextView = rootview.findViewById(R.id.category_text)
-
-        initData(rootview.context)
-    }
-
-    fun initData(rootContext : Context) {
-        mInfoTextView.text = mItemData.E_Info
-        mInfoMemoTextView.text = mItemData.E_Memo
-        mInfoCategoryTextView.text = mItemData.E_Category
-
-        GlideApp.with(rootContext)
-            .load(mItemData.E_Pic_URL)
-            .fitCenter()
-            .placeholder(R.drawable.default_img)
-            .transform(GlideRoundTransform(2))
-            .centerCrop()
-            .into(mInfoImg)
-
-        mOpenWebview.setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(mItemData.E_URL)))
-        }
-    }
-
     fun callPlanetListAPI() {
 
         addCompositeDisposable(ApiClient.getPlanetList(mItemData.E_Name).subscribeWith(object : Subscriber<PlanetRoot>() {
@@ -125,11 +96,10 @@ class LocationInfoFragment: RetrofitFragment(){
 
                 responseData.result.results?.let {
                     if (it.isNotEmpty()) {
-                        mRecGroup.visibility = View.VISIBLE
                         mResults = responseData.result.results.toMutableList()
-                        mAdapter.refreshData(mResults)
+                        mAdapter.refreshData(mResults, mItemData)
                     } else {
-                        mRecGroup.visibility = View.GONE
+                        mAdapter.refreshData(mResults, mItemData)
                     }
                 }
 
@@ -138,7 +108,7 @@ class LocationInfoFragment: RetrofitFragment(){
             override fun onError(throwable: Throwable) {
                 super.onError(throwable)
                 progressBar.visibility = View.GONE
-                mRecGroup.visibility = View.GONE
+                mAdapter.refreshData(mResults, mItemData)
             }
         }))
     }
